@@ -38,7 +38,7 @@ const dbConnection = mongoose.connection
 dbConnection.on('error', console.error.bind(console, 'connection error:'))
 dbConnection.once('open', function () {
     // we're connected!
-    //console.log('db connected!!!')
+    console.log('db connected!!!')
 });
 
 const app = express()
@@ -176,5 +176,5 @@ app.get('/', (req, res) => {
 })
 
 app.listen(process.env.PORT || 4000, () => {
-    console.log('calc app started')
+    console.log('football-server app started')
 })
