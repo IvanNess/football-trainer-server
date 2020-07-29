@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
+const cookieParser = require('cookie-parser')
 //const jwt = require('jsonwebtoken')
 const session = require('express-session')
 const bcrypt = require('bcryptjs')
@@ -47,6 +48,8 @@ app.use(cors({
     //methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     credentials: true, // allow session cookie from browser to pass through,
 }))
+
+app.use(cookieParser())
 
 app.use(session({
     secret: process.env.SESSION_SECRET,
@@ -111,7 +114,7 @@ app.post('/login', async (req, res, next) => {
     }    
     req.login(user, function (err) {
         if (err) { return next(err); }
-        return res.status(200).send({
+        return res.cookie('SameSite', 'None').cookie('Secure', true).status(200).send({
             username: user.username
         });
     })
@@ -126,7 +129,7 @@ app.post('/logout', async (req, res, next) => {
 })
 
 app.post('/user', async (req, res, next) => {
-    //console.log(req)
+    console.log(req.session)
     if (!req.session.passport) {
         return res.sendStatus(404)
     }
@@ -134,12 +137,12 @@ app.post('/user', async (req, res, next) => {
     //console.log('user', user)
     const fullLoad = req.body.fullLoad
     if (user && !fullLoad) {
-        return res.status(200).send({
+        return res.cookie('SameSite', 'None').cookie('Secure', true).status(200).send({
             username: user.username
         })
     }
     if (user && fullLoad) {
-        return res.status(200).send({
+        return res.cookie('SameSite', 'None').cookie('Secure', true).status(200).send({
             username: user.username,
             remember: user.remember,
             results: user.results
