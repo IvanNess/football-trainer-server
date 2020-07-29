@@ -175,23 +175,6 @@ app.get('/', (req, res) => {
     res.send('ok')
 })
 
-app.post('/', async (req, res) => {
-    try {
-        const data = getPrice(req.body)
-        const token = req.body.token
-        let user = await User.findOne({ token })
-        if (!user) {
-            user = await User.findOne({ token: 'none' })
-            user = user ? user : new User({ fingerPrint: 'in services', token: 'none' })
-        }
-        //console.log('req.body', req.body)
-        const calcs = await user.addCalc({ ...req.body, min: data[0], max: data[1] })
-        res.send({ min: data[0], max: data[1] })
-    } catch (e) {
-        res.sendStatus(500)
-    }
-})
-
 app.listen(process.env.PORT || 4000, () => {
     console.log('calc app started')
 })
