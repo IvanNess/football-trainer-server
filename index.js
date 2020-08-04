@@ -45,6 +45,8 @@ dbConnection.once('open', function () {
 
 const app = express()
 
+app.set('trust proxy', 1)
+
 let store = new MongoDBStore({
     uri,
     collection: 'sessions'
