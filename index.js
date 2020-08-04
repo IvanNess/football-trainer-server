@@ -57,11 +57,12 @@ app.use(cors({
 }))
 
 app.use(session({
+    name: 'newname',
     secret: process.env.SESSION_SECRET,
-    // cookie:{
-    //     'sameSite': 'none',
-    //     'secure': true
-    // },
+    cookie:{
+        sameSite: "none",
+        secure: true
+    },
     resave: false,
     saveUninitialized: true,
     store
@@ -158,6 +159,9 @@ app.post('/logout', async (req, res, next) => {
 })
 
 app.post('/user', async (req, res, next) => {
+    // res.cookie('SameSite', 'None')
+    // res.cookie('Secure', true)
+
     console.log(req.session)
     if (!req.session.passport) {
         return res.sendStatus(404)
