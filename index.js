@@ -2,34 +2,35 @@ const mongoose = require('mongoose')
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
-const cookieParser = require('cookie-parser')
 //const jwt = require('jsonwebtoken')
 const session = require('express-session')
+const MongoDBStore = require('connect-mongodb-session')(session)
 const bcrypt = require('bcryptjs')
 
 const passport = require('passport')
-//const LocalStrategy = require('passport-local').Strategy
+const LocalStrategy = require('passport-local').Strategy
 
 const UserSchema = require('./schema')
 
 const User = mongoose.model('User', UserSchema)
 
-// passport.use(new LocalStrategy(async function (username, password, done) {
-//     console.log(username, password)
-//     try {
-//         const user = await User.findOne({ username: username })
-//         if (!user) {
-//             return done(null, false, { message: 'Incorrect username.' })
-//         }
-//         const isPasswordCorrect = await bcrypt.compare(password, user.password)
-//         if (!isPasswordCorrect) {
-//             return done(null, false, { message: 'Incorrect password.' })
-//         }
-//         return done(null, user)
-//     } catch (err) {
-//         return done(err)
-//     }
-// }));
+passport.use(new LocalStrategy(async function (username, password, done) {
+    console.log(username, password)
+    try {
+        const user = await User.findOne({ username: username })
+        console.log(user, user.username)
+        if (!user) {
+            return done(null, false, { message: 'Incorrect username.' })
+        }
+        const isPasswordCorrect = await bcrypt.compare(password, user.password)
+        if (!isPasswordCorrect) {
+            return done(null, false, { message: 'Incorrect password.' })
+        }
+        return done(null, user)
+    } catch (err) {
+        return done(err)
+    }
+}));
 
 const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_URI}/${process.env.MONGO_DB}?retryWrites=true&w=majority`
 
@@ -43,18 +44,27 @@ dbConnection.once('open', function () {
 });
 
 const app = express()
+
+let store = new MongoDBStore({
+    uri,
+    collection: 'sessions'
+});
+
 app.use(cors({
     origin: process.env.ORIGIN,// allow to server to accept request from different origin
     //methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     credentials: true, // allow session cookie from browser to pass through,
 }))
 
-app.use(cookieParser())
-
 app.use(session({
     secret: process.env.SESSION_SECRET,
+    // cookie:{
+    //     'sameSite': 'none',
+    //     'secure': true
+    // },
     resave: false,
-    saveUninitialized: true
+    saveUninitialized: true,
+    store
 }))
 
 app.use(bodyParser.json()) //чтобы парсить json
@@ -64,12 +74,12 @@ app.use(passport.initialize())
 app.use(passport.session())
 
 passport.serializeUser(function (user, done) {
-    //console.log('user_to serialize', user)
+    console.log('user_to serialize', user)
     done(null, user._id)
 });
 
 passport.deserializeUser(function (id, done) {
-    //console.log('object_to deserialize', id)    
+    console.log('object_to deserialize', id)    
     const user = User.find({ _id: id })
     done(null, user);
 });
@@ -99,26 +109,45 @@ app.post('/signup', async (req, res, next) => {
     })
 })
 
-app.post('/login', async (req, res, next) => {
-    //console.log(req)
-    const user = await User.findOne({ username: req.body.data.username })
-    //console.log(user)
-    if (!user) {
-        return res.sendStatus(403)
-    } 
-    //console.log(req.body.data.password, user.password)
-    const passwordCheck = await bcrypt.compare(req.body.data.password, user.password)
-    //console.log(await bcrypt.compare(req.body.data.password, user.password))
-    if (!passwordCheck) {
-        return res.sendStatus(403)
-    }    
-    req.login(user, function (err) {
-        if (err) { return next(err); }
-        return res.cookie('SameSite', 'None').cookie('Secure', true).status(200).send({
-            username: user.username
-        });
-    })
-})
+// app.post('/login', async (req, res, next) => {
+//     //console.log(req)
+//     const user = await User.findOne({ username: req.body.data.username })
+//     //console.log(user)
+//     if (!user) {
+//         return res.sendStatus(403)
+//     } 
+//     //console.log(req.body.data.password, user.password)
+//     const passwordCheck = await bcrypt.compare(req.body.data.password, user.password)
+//     //console.log(await bcrypt.compare(req.body.data.password, user.password))
+//     if (!passwordCheck) {
+//         return res.sendStatus(403)
+//     }    
+//     req.login(user, function (err) {
+//         if (err) { return next(err); }
+//         return res.status(200).send({
+//             username: user.username
+//         });
+//     })
+// })
+
+app.post('/login',
+    passport.authenticate('local'),
+    async(req, res) => {
+        // If this function gets called, authentication was successful.
+        // `req.user` contains the authenticated user.
+        console.log('login', req.user)
+        // req.login(req.user, function (err) {
+        //     if (err) { return next(err); }
+        //     return res.status(200).send({
+        //         username: req.user.username
+        //     })
+        // })
+
+        return res.status(200).send({
+            username: req.user.username
+        })
+    }
+)
 
 app.post('/logout', async (req, res, next) => {
     //console.log('logout')
@@ -134,15 +163,17 @@ app.post('/user', async (req, res, next) => {
         return res.sendStatus(404)
     }
     const user = await User.findOne({ _id: req.session.passport.user })
-    //console.log('user', user)
+    console.log('user', user,)
     const fullLoad = req.body.fullLoad
+
+    console.log('req body', req.body)
     if (user && !fullLoad) {
-        return res.cookie('SameSite', 'None').cookie('Secure', true).status(200).send({
+        return res.status(200).send({
             username: user.username
         })
     }
     if (user && fullLoad) {
-        return res.cookie('SameSite', 'None').cookie('Secure', true).status(200).send({
+        return res.status(200).send({
             username: user.username,
             remember: user.remember,
             results: user.results
@@ -152,6 +183,7 @@ app.post('/user', async (req, res, next) => {
         return res.sendStatus(404)
     }
 })
+
 
 app.post('/record', async (req, res, next) => {
     //console.log(req)
